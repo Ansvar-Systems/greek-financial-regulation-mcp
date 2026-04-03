@@ -1,31 +1,37 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "eu.ansvar/greek-financial-regulation-mcp",
-  "description": "Query HCMC decisions, circulars, and Bank of Greece Governor's Acts on financial supervision",
+  "description": "HCMC (Hellenic Capital Market Commission) and Bank of Greece MCP server — decisions, circulars, and Governor's Acts",
   "repository": {
     "url": "https://github.com/Ansvar-Systems/greek-financial-regulation-mcp",
     "source": "github"
   },
   "homepage": "https://ansvar.eu",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "license": "Apache-2.0",
   "keywords": [
-    "hcmc",
-    "bank-of-greece",
-    "greek-financial-regulation",
-    "financial-services",
+    "financial regulation",
+    "greece",
+    "regulation",
     "compliance",
-    "enforcement",
-    "mcp",
-    "ansvar"
+    "mcp"
   ],
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@ansvar/greek-financial-regulation-mcp",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "transport": {
         "type": "stdio"
+      }
+    },
+    {
+      "registryType": "npm",
+      "identifier": "@ansvar/greek-financial-regulation-mcp",
+      "version": "1.0.0",
+      "transport": {
+        "type": "streamable-http",
+        "url": "https://mcp.ansvar.eu/greek-financial-regulation/mcp"
       }
     }
   ]
