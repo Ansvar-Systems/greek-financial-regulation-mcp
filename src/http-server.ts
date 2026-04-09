@@ -30,6 +30,7 @@ import {
   searchEnforcement,
   checkProvisionCurrency,
 } from "./db.js";
+import { buildCitation } from "./utils/citation.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -121,6 +122,18 @@ const TOOLS = [
     description: "Return metadata about this MCP server: version, data source, tool list.",
     inputSchema: { type: "object" as const, properties: {}, required: [] },
   },
+  {
+    name: "gr_fin_list_sources",
+    description:
+      "List all data sources (HCMC and Bank of Greece sourcebook categories) with their names and descriptions.",
+    inputSchema: { type: "object" as const, properties: {}, required: [] },
+  },
+  {
+    name: "gr_fin_check_data_freshness",
+    description:
+      "Check when data was last ingested from HCMC and Bank of Greece sources, and how many provisions are available.",
+    inputSchema: { type: "object" as const, properties: {}, required: [] },
+  },
 ];
 
 // --- Zod schemas ---
@@ -162,15 +175,51 @@ function createMcpServer(): Server {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args = {} } = request.params;
 
-    function textContent(data: unknown) {
+    function responseMeta(): Record<string, unknown> {
+      let dataAge: string = "unknown";
+      try {
+        const state = JSON.parse(
+          readFileSync(
+            join(__dirname, "..", "data", "ingest-state.json"),
+            "utf8",
+          ),
+        ) as { lastRun?: string };
+        if (state.lastRun) dataAge = state.lastRun;
+      } catch {
+        // ignore
+      }
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+        disclaimer:
+          "This data is provided for informational purposes only and does not constitute legal advice. Always verify against official HCMC and Bank of Greece sources.",
+        data_age: dataAge,
+        copyright:
+          "Data sourced from HCMC (https://www.hcmc.gr/) and Bank of Greece (https://www.bankofgreece.gr/). All rights reserved by respective authorities.",
+        source_url: "https://www.hcmc.gr/",
       };
     }
 
-    function errorContent(message: string) {
+    function textContent(data: unknown) {
+      const enriched =
+        typeof data === "object" && data !== null
+          ? { ...(data as Record<string, unknown>), _meta: responseMeta() }
+          : { data, _meta: responseMeta() };
       return {
-        content: [{ type: "text" as const, text: message }],
+        content: [{ type: "text" as const, text: JSON.stringify(enriched, null, 2) }],
+      };
+    }
+
+    function errorContent(message: string, errorType = "tool_error") {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(
+              { error: message, _error_type: errorType, _meta: responseMeta() },
+              null,
+              2,
+            ),
+          },
+        ],
         isError: true as const,
       };
     }
@@ -185,7 +234,22 @@ function createMcpServer(): Server {
             status: parsed.status,
             limit: parsed.limit,
           });
-          return textContent({ results, count: results.length });
+          const resultsWithCitation = results.map((r) => {
+            const p = r as Record<string, unknown>;
+            return {
+              ...r,
+              _citation: buildCitation(
+                `${String(p["sourcebook_id"] ?? "")} ${String(p["reference"] ?? "")}`,
+                String(p["title"] ?? `${p["sourcebook_id"]} ${p["reference"]}`),
+                "gr_fin_get_regulation",
+                {
+                  sourcebook: String(p["sourcebook_id"] ?? ""),
+                  reference: String(p["reference"] ?? ""),
+                },
+              ),
+            };
+          });
+          return textContent({ results: resultsWithCitation, count: resultsWithCitation.length });
         }
 
         case "gr_fin_get_regulation": {
@@ -196,7 +260,17 @@ function createMcpServer(): Server {
               `Provision not found: ${parsed.sourcebook} ${parsed.reference}`,
             );
           }
-          return textContent(provision);
+          const p = provision as Record<string, unknown>;
+          return textContent({
+            ...provision,
+            _citation: buildCitation(
+              `${parsed.sourcebook} ${String(p["reference"] ?? parsed.reference)}`,
+              String(p["title"] ?? `${parsed.sourcebook} ${parsed.reference}`),
+              "gr_fin_get_regulation",
+              { sourcebook: parsed.sourcebook, reference: parsed.reference },
+              p["url"] as string | undefined,
+            ),
+          });
         }
 
         case "gr_fin_list_sourcebooks": {
@@ -211,7 +285,19 @@ function createMcpServer(): Server {
             action_type: parsed.action_type,
             limit: parsed.limit,
           });
-          return textContent({ results, count: results.length });
+          const resultsWithCitation = results.map((r) => {
+            const e = r as Record<string, unknown>;
+            return {
+              ...r,
+              _citation: buildCitation(
+                String(e["reference_number"] ?? e["firm_name"] ?? ""),
+                String(e["firm_name"] ?? ""),
+                "gr_fin_search_enforcement",
+                { query: String(e["firm_name"] ?? "") },
+              ),
+            };
+          });
+          return textContent({ results: resultsWithCitation, count: resultsWithCitation.length });
         }
 
         case "gr_fin_check_currency": {
@@ -228,6 +314,43 @@ function createMcpServer(): Server {
               "HCMC (Hellenic Capital Market Commission) and Bank of Greece MCP server. Provides access to Greek financial supervision decisions, circulars, and Governor's Acts.",
             data_source: "HCMC (https://www.hcmc.gr/) and Bank of Greece (https://www.bankofgreece.gr/)",
             tools: TOOLS.map((t) => ({ name: t.name, description: t.description })),
+          });
+        }
+
+        case "gr_fin_list_sources": {
+          const sourcebooks = listSourcebooks();
+          return textContent({ sources: sourcebooks, count: sourcebooks.length });
+        }
+
+        case "gr_fin_check_data_freshness": {
+          let state: Record<string, unknown> = {};
+          try {
+            state = JSON.parse(
+              readFileSync(
+                join(__dirname, "..", "data", "ingest-state.json"),
+                "utf8",
+              ),
+            ) as Record<string, unknown>;
+          } catch {
+            // ignore
+          }
+          const lastRun = state["lastRun"] as string | undefined;
+          const provisionsIngested = state["provisionsIngested"] as
+            | number
+            | undefined;
+          const enforcementIngested = state["enforcementIngested"] as
+            | number
+            | undefined;
+          const freshThresholdMs = 7 * 24 * 60 * 60 * 1000;
+          const isFresh = lastRun
+            ? Date.now() - new Date(lastRun).getTime() < freshThresholdMs
+            : false;
+          return textContent({
+            last_run: lastRun ?? null,
+            provisions_ingested: provisionsIngested ?? 0,
+            enforcement_ingested: enforcementIngested ?? 0,
+            is_fresh: isFresh,
+            freshness_threshold_days: 7,
           });
         }
 

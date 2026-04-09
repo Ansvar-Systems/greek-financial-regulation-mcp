@@ -1,0 +1,71 @@
+name: Ingest Data
+
+on:
+  schedule:
+    # Every Sunday at 02:00 UTC
+    - cron: "0 2 * * 0"
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: "Force rebuild Docker image after ingest"
+        type: boolean
+        default: true
+
+jobs:
+  ingest:
+    name: Ingest HCMC & Bank of Greece data
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run data ingestion
+        run: npm run ingest
+        env:
+          HCMC_DB_PATH: data/hcmc.db
+
+      - name: Show ingest state
+        run: |
+          echo "## Ingest Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f data/ingest-state.json ]; then
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat data/ingest-state.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No ingest-state.json found." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Commit updated ingest-state.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/ingest-state.json
+          git diff --staged --quiet || git commit -m "chore: update ingest-state.json [skip ci]"
+          git push
+
+      - name: Trigger Docker build
+        if: ${{ github.event.inputs.force_rebuild == 'true' || github.event_name == 'schedule' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'ghcr-build.yml',
+              ref: context.ref,
+            });
+            console.log('Triggered ghcr-build.yml workflow dispatch');
