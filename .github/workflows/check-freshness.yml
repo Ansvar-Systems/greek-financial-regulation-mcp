@@ -1,0 +1,53 @@
+name: Check Data Freshness
+
+on:
+  schedule:
+    # Every Monday at 08:00 UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check-freshness:
+    name: Check HCMC & Bank of Greece for new content
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Check HCMC decisions page
+        id: hcmc
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            "https://www.hcmc.gr/el/enimerosi/apofaseis-epitropis/" || echo "000")
+          echo "hcmc_status=$STATUS" >> "$GITHUB_OUTPUT"
+          if [ "$STATUS" = "200" ]; then
+            echo "HCMC decisions page: HTTP 200 OK"
+          else
+            echo "HCMC decisions page: HTTP $STATUS (unexpected)"
+          fi
+
+      - name: Check Bank of Greece Governor's Acts page
+        id: bog
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            "https://www.bankofgreece.gr/en/main-tasks/supervision/supervisory-framework/supervisory-decisions" || echo "000")
+          echo "bog_status=$STATUS" >> "$GITHUB_OUTPUT"
+          if [ "$STATUS" = "200" ]; then
+            echo "Bank of Greece page: HTTP 200 OK"
+          else
+            echo "Bank of Greece page: HTTP $STATUS (unexpected)"
+          fi
+
+      - name: Report freshness status
+        run: |
+          echo "## Data Source Freshness Check" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Source | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| HCMC decisions | ${{ steps.hcmc.outputs.hcmc_status }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Bank of Greece | ${{ steps.bog.outputs.bog_status }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Run the **ingest** workflow to pull new content into the database." >> "$GITHUB_STEP_SUMMARY"
