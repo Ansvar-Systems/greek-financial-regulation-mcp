@@ -1,0 +1,70 @@
+{
+  "$schema": "https://ansvar.eu/schemas/mcp-coverage/v1.json",
+  "mcp": "eu.ansvar/greek-financial-regulation-mcp",
+  "jurisdiction": "GR",
+  "domain": "financial-regulation",
+  "regulators": [
+    {
+      "id": "HCMC",
+      "name": "Hellenic Capital Market Commission",
+      "name_local": "Επιτροπή Κεφαλαιαγοράς",
+      "url": "https://www.hcmc.gr/",
+      "sourcebooks": [
+        {
+          "id": "HCMC_Apofaseis",
+          "name": "HCMC Decisions",
+          "name_local": "Αποφάσεις Επιτροπής Κεφαλαιαγοράς",
+          "description": "Capital markets supervision decisions issued by the HCMC Board"
+        },
+        {
+          "id": "HCMC_Egkyklioi",
+          "name": "HCMC Circulars",
+          "name_local": "Εγκύκλιοι Επιτροπής Κεφαλαιαγοράς",
+          "description": "Regulatory guidance, interpretations, and notices"
+        }
+      ]
+    },
+    {
+      "id": "BOG",
+      "name": "Bank of Greece",
+      "name_local": "Τράπεζα της Ελλάδος",
+      "url": "https://www.bankofgreece.gr/",
+      "sourcebooks": [
+        {
+          "id": "BOG_Praxeis_Dioikiti",
+          "name": "Bank of Greece Governor's Acts",
+          "name_local": "Πράξεις Διοικητή Τράπεζας της Ελλάδος",
+          "description": "Governor's Acts on banking supervision, payment services, and monetary policy"
+        },
+        {
+          "id": "BOG_Exec_Committee",
+          "name": "Bank of Greece Executive Committee Acts",
+          "name_local": "Πράξεις Εκτελεστικής Επιτροπής",
+          "description": "Executive Committee decisions on systemic risk and resolution"
+        }
+      ]
+    }
+  ],
+  "topics": [
+    "capital-markets",
+    "investment-services",
+    "market-abuse",
+    "aml-ctf",
+    "banking-supervision",
+    "payment-services",
+    "insurance",
+    "collective-investment",
+    "consumer-credit",
+    "prospectus",
+    "short-selling",
+    "resolution"
+  ],
+  "not_covered": [
+    "greek-primary-legislation",
+    "eu-regulation-text",
+    "court-decisions",
+    "esma-eba-guidance-not-adopted-in-greece"
+  ],
+  "ingest_schedule": "weekly",
+  "freshness_tool": "gr_fin_check_data_freshness"
+}
