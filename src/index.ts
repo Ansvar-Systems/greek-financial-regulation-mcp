@@ -272,7 +272,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           limit: parsed.limit,
         });
         const resultsWithCitation = results.map((r) => {
-          const p = r as Record<string, unknown>;
+          const p = r as unknown as Record<string, unknown>;
           return {
             ...r,
             _citation: buildCitation(
@@ -297,7 +297,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             `Provision not found: ${parsed.sourcebook} ${parsed.reference}`,
           );
         }
-        const p = provision as Record<string, unknown>;
+        const p = provision as unknown as Record<string, unknown>;
         return textContent({
           ...provision,
           _citation: buildCitation(
@@ -323,7 +323,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           limit: parsed.limit,
         });
         const resultsWithCitation = results.map((r) => {
-          const e = r as Record<string, unknown>;
+          const e = r as unknown as Record<string, unknown>;
           return {
             ...r,
             _citation: buildCitation(
